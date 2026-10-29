@@ -1,0 +1,10 @@
+{
+  "name": "secure-baseline",
+  "version": "0.1.0",
+  "description": "Generate a security baseline (pre-commit hooks, CI checks, hardened Docker config, AI-agent rules) for JS/TS and Python projects.",
+  "type": "module",
+  "bin": { "secure-baseline": "bin/cli.js" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}

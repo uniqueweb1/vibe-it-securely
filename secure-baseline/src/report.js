@@ -32,7 +32,7 @@ export function formatReport(result, { maxLocations = 5 } = {}) {
       out.push(`[${LABEL[sev]}] ${rule.title}`);
       const located = list.filter((f) => f.file);
       if (located.length) {
-        const shown = located.slice(0, maxLocations).map((f) => (f.line ? `${f.file}:${f.line}` : f.file));
+        const shown = located.slice(0, maxLocations).map((f) => (f.line ? `${f.file}:${f.line}` : f.file) + (f.detail ? ` (${f.detail})` : ""));
         const more = located.length - shown.length;
           out.push(`  Where: ${shown.join(", ")}${more > 0 ? `, and ${more} more` : ""}`);
       }
@@ -40,6 +40,8 @@ export function formatReport(result, { maxLocations = 5 } = {}) {
     }
   }
 
+  for (const n of result.notes || []) out.push(n);
+  if ((result.notes || []).length) out.push("");
   const total = counts.high + counts.medium + counts.info;
   out.push(`Scanned ${filesScanned} files. Found ${counts.high} high, ${counts.medium} medium, ${counts.info} info.`);
   if (total === 0) out.push("Nothing found by these checks.");

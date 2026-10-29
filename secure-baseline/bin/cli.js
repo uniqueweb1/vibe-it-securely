@@ -2,6 +2,7 @@
 import path from "node:path";
 import { init } from "../src/init.js";
 import { check } from "../src/check.js";
+import { checkDependencies } from "../src/deps.js";
 import { formatReport, countBySeverity } from "../src/report.js";
 
 const args = process.argv.slice(2);
@@ -17,7 +18,7 @@ const HELP = `secure-baseline - a security baseline for your project
 
 Usage:
   secure-baseline init  [--dir <path>] [--dry-run] [--no-docker]
-  secure-baseline check [--dir <path>] [--fail-on high|medium|none] [--json]
+  secure-baseline check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
 
 init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assistant
        rules. Existing files are never overwritten; new versions are saved as
@@ -25,6 +26,8 @@ init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assis
        and scripts that do not ship as a container.
 check  Looks for leaked secrets, risky code patterns, Docker problems and missing
        safeguards, and explains each finding in plain language.
+       --online also verifies that every dependency name really exists on npm/PyPI
+       (AI tools sometimes invent package names). It contacts the public registries.
        Exit code 1 if anything at or above --fail-on is found (default: high).`;
 
 if (!cmd || cmd === "--help" || cmd === "-h") {
@@ -66,7 +69,13 @@ if (cmd === "init") {
     process.exit(1);
   }
   const result = check(dir);
-  if (flag("--json")) console.log(JSON.stringify({ findings: result.findings, filesScanned: result.filesScanned }, null, 2));
+  result.notes = [];
+  if (flag("--online")) {
+    const dep = await checkDependencies(dir);
+    result.findings.push(...dep.findings);
+    result.notes.push(`Checked ${dep.checked} dependency names against npm/PyPI.` + (dep.unverified ? ` ${dep.unverified} could not be verified (network problem or private registry).` : ""));
+  }
+  if (flag("--json")) console.log(JSON.stringify({ findings: result.findings, filesScanned: result.filesScanned, notes: result.notes }, null, 2));
   else console.log(formatReport(result));
   const c = countBySeverity(result.findings);
   const fail = failOn === "high" ? c.high > 0 : failOn === "medium" ? c.high + c.medium > 0 : false;

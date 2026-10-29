@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { detectStack } from "./detect.js";
+import { lineSecretRule, checkRoutes, analyzeSql, detectSupabase, PUBLIC_ENV } from "./vibe.js";
 
 /**
  * Every rule carries its own plain-language explanation, so findings are
@@ -141,6 +142,43 @@ export const RULES = {
     title: "Debug mode is switched on",
     why: "Debug mode can expose source code, settings and an interactive console to anyone who triggers an error.",
     fix: "Read it from an environment variable and keep it False in production.",
+  },
+
+  "public-env-secret": {
+    severity: "high",
+    title: "A secret is exposed to the browser through a public environment variable",
+    why: "Variables starting with NEXT_PUBLIC_, VITE_, REACT_APP_ and similar are bundled into the website code that every visitor can read. A secret placed there is public.",
+    fix: "Remove the public prefix and use the value only on the server. Keep only values that are meant to be public (like a publishable key) in public variables, and replace the leaked secret.",
+  },
+  "supabase-service-key": {
+    severity: "high",
+    title: "A Supabase service_role key is in the code",
+    why: "The service_role key bypasses every database security rule. Anyone who finds it can read, change or delete all of your data.",
+    fix: "Rotate the key in your Supabase dashboard now, then use it only on the server through an environment variable. Browser code should use the anon key together with row level security.",
+  },
+  "js-route-no-auth": {
+    severity: "medium",
+    title: "A route that changes data shows no sign of a login check",
+    why: "Without a check, anyone on the internet who finds the address can create, change or delete data. AI tools often generate routes like this and forget the login check.",
+    fix: "Check who the user is before doing the work, for example with auth middleware or a session check, and return 401 if they are not logged in. If the route is meant to be public, add the comment secure-baseline-ignore on its line.",
+  },
+  "sql-rls-disabled": {
+    severity: "medium",
+    title: "Row level security is switched off for a table",
+    why: "In Supabase, tables in the public schema are reachable from the browser with the public key. Without row level security, any visitor can read or modify every row.",
+    fix: "Remove the DISABLE statement, run ALTER TABLE <name> ENABLE ROW LEVEL SECURITY, and add policies that say who may read and write which rows.",
+  },
+  "sql-rls-missing": {
+    severity: "medium",
+    title: "A table is created but row level security is never enabled for it",
+    why: "In Supabase, a table in the public schema without row level security can be read and changed by anyone who has your public key.",
+    fix: "Add ALTER TABLE <name> ENABLE ROW LEVEL SECURITY and policies for who may read and write which rows.",
+  },
+  "dep-not-found": {
+    severity: "high",
+    title: "A dependency does not exist on the public package registry",
+    why: "AI tools sometimes invent package names. If an attacker registers that name, installing your project would run their code. A misspelled name is just as dangerous.",
+    fix: "Check the spelling. If the AI made the name up, remove it and find the real package that does the job.",
   },
 
   // ---------- Docker ----------
@@ -303,7 +341,7 @@ function scanFile(dir, rel, add) {
   } catch {
     return;
   }
-  if (stat.size > MAX_BYTES || SKIP_FILES.test(rel) || isEnvFile(rel)) return;
+  if (stat.size > MAX_BYTES || SKIP_FILES.test(rel)) return;
   let text;
   try {
     text = fs.readFileSync(full, "utf8");
@@ -312,6 +350,14 @@ function scanFile(dir, rel, add) {
   }
   if (text.includes("\u0000")) return;
 
+  // Real .env files are meant to hold secrets: only check they do not leak to the browser
+  if (isEnvFile(rel)) {
+    text.split(/\r?\n/).forEach((line, i) => {
+      if (PUBLIC_ENV.test(line) && !line.includes(IGNORE_MARK)) add("public-env-secret", rel, i + 1);
+    });
+    return;
+  }
+
   const ext = path.extname(rel).toLowerCase();
   const codePatterns = JS_EXT.has(ext) ? JS_PATTERNS : PY_EXT.has(ext) ? PY_PATTERNS : [];
   const lines = text.split(/\r?\n/);
@@ -319,6 +365,9 @@ function scanFile(dir, rel, add) {
   lines.forEach((line, i) => {
     if (line.length > 2000 || line.includes(IGNORE_MARK)) return;
     const n = i + 1;
+
+    const vibeRule = lineSecretRule(line);
+    if (vibeRule) add(vibeRule, rel, n);
 
     let secretHit = false;
     for (const [id, re] of SECRET_PATTERNS) {
@@ -336,6 +385,8 @@ function scanFile(dir, rel, add) {
       for (const [id, re] of codePatterns) if (re.test(line)) add(id, rel, n);
     }
   });
+
+  if (JS_EXT.has(ext)) checkRoutes(rel, lines, add);
 }
 
 function checkDockerfile(rel, text, add) {
@@ -395,13 +446,14 @@ const isIgnored = (rel, patterns) =>
 export function check(dir) {
   const stack = detectStack(dir);
   const findings = [];
-  const add = (ruleId, file, line) => findings.push({ ruleId, severity: RULES[ruleId].severity, file, line });
+  const add = (ruleId, file, line, detail) => findings.push({ ruleId, severity: RULES[ruleId].severity, file, line, detail });
 
   const ignored = loadIgnore(dir);
   const files = walk(dir).filter((f) => !isIgnored(f, ignored));
   const has = (f) => fs.existsSync(path.join(dir, f));
 
   for (const rel of files) scanFile(dir, rel, add);
+  analyzeSql(dir, files.filter((f) => f.endsWith(".sql")), detectSupabase(dir, files), add);
 
   const dockerfiles = files.filter((f) => /^(Dockerfile(\.[\w.-]+)?|[\w.-]+\.dockerfile)$/i.test(path.basename(f)) && !f.endsWith(".suggested"));
   for (const rel of dockerfiles) {

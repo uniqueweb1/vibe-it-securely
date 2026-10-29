@@ -4,7 +4,7 @@ import { detectStack } from "./detect.js";
 import { safeWrite } from "./safe-write.js";
 import * as t from "./templates.js";
 
-export function init({ dir, dryRun = false }) {
+export function init({ dir, dryRun = false, docker = true }) {
   const stack = detectStack(dir);
   if (!stack.node && !stack.python) {
     return { stack, results: [], notes: [], error: "No supported project found (looked for package.json, requirements.txt, pyproject.toml, Pipfile, setup.py)." };
@@ -13,16 +13,22 @@ export function init({ dir, dryRun = false }) {
   const files = [
     { path: ".pre-commit-config.yaml", content: t.preCommit() },
     { path: ".github/workflows/security.yml", content: t.ciWorkflow(stack) },
-    { path: ".dockerignore", content: t.dockerignore() },
     { path: "AGENTS.md", content: t.agentRules(stack) },
   ];
 
-  if (stack.node && stack.python) {
+  if (!docker) {
+    // libraries, CLIs and scripts do not need container files
+  } else if (stack.node && stack.python) {
+    files.push(
+      { path: ".dockerignore", content: t.dockerignore() },
+    );
     files.push({ path: "Dockerfile.node", content: t.dockerfileNode(stack) });
     files.push({ path: "Dockerfile.python", content: t.dockerfilePython(stack) });
   } else if (stack.node) {
+    files.push({ path: ".dockerignore", content: t.dockerignore() });
     files.push({ path: "Dockerfile", content: t.dockerfileNode(stack) });
   } else {
+    files.push({ path: ".dockerignore", content: t.dockerignore() });
     files.push({ path: "Dockerfile", content: t.dockerfilePython(stack) });
   }
 

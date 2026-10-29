@@ -25,13 +25,17 @@ Detects your stack (JS, TS, Python, or a mix; npm, pnpm or yarn) and generates:
 | `.github/workflows/security.yml` | The same checks in CI, plus dependency audit and static analysis. CI is the real enforcement, because local hooks can be skipped with `--no-verify` |
 | `Dockerfile`, `.dockerignore` | Multi-stage build, non-root user, no secrets copied in (skip with `--no-docker`) |
 | `AGENTS.md` | Security rules for AI coding assistants (copy to `CLAUDE.md` or `.cursorrules` if your tool needs that name) |
-| `.env.example`, `.gitignore` | Created only if missing |
+| `.env.example`, `.gitignore`, `.gitleaksignore` | Created only if missing |
 
 **It never overwrites your files.** If one already exists, the new version is saved as `<name>.suggested` for you to review and merge.
 
 Options: `--dir <path>`, `--dry-run`, `--no-docker`.
 
 After `init`: `pip install pre-commit && pre-commit install`.
+
+### Secret scan flagged something fake?
+
+The CI secret scan (gitleaks) also looks at your git history, so a fake key in a test file can fail the build. If the value is fake or an example, copy the `Fingerprint:` line from the CI log into `.gitleaksignore` (one per line; `#` starts a comment). Better still, build fake values at runtime in tests so no scanner sees a literal. If the value is real, revoke it and replace it instead.
 
 ### What blocks and what only warns
 

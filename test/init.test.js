@@ -91,3 +91,16 @@ test("--no-docker skips container files", () => {
   assert.ok(!fs.existsSync(path.join(d, ".dockerignore")));
   assert.ok(fs.existsSync(path.join(d, ".pre-commit-config.yaml")));
 });
+
+test("init creates a .gitleaksignore stub and never overwrites an existing one", () => {
+  const d = tmp();
+  write(d, "package.json", "{}");
+  write(d, ".gitleaksignore", "my-existing-fingerprint\n");
+  init({ dir: d });
+  assert.equal(fs.readFileSync(path.join(d, ".gitleaksignore"), "utf8"), "my-existing-fingerprint\n");
+  assert.ok(!fs.existsSync(path.join(d, ".gitleaksignore.suggested")));
+  const e = tmp();
+  write(e, "package.json", "{}");
+  init({ dir: e });
+  assert.ok(fs.existsSync(path.join(e, ".gitleaksignore")));
+});

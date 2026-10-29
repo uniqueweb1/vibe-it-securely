@@ -1,4 +1,4 @@
-# secure-baseline
+# vibe-it-securely
 
 A security baseline for JavaScript, TypeScript and Python projects, set up with one command.
 
@@ -9,8 +9,8 @@ Built for people who build fast with AI coding tools and are not sure whether th
 ## Quick start
 
 ```bash
-npx secure-baseline init     # generate the baseline files
-npx secure-baseline check    # find problems, explained in plain language
+npx vibe-it-securely init     # generate the baseline files
+npx vibe-it-securely check    # find problems, explained in plain language
 ```
 
 Requires Node 18+. No dependencies.
@@ -25,13 +25,17 @@ Detects your stack (JS, TS, Python, or a mix; npm, pnpm or yarn) and generates:
 | `.github/workflows/security.yml` | The same checks in CI, plus dependency audit and static analysis. CI is the real enforcement, because local hooks can be skipped with `--no-verify` |
 | `Dockerfile`, `.dockerignore` | Multi-stage build, non-root user, no secrets copied in (skip with `--no-docker`) |
 | `AGENTS.md` | Security rules for AI coding assistants (copy to `CLAUDE.md` or `.cursorrules` if your tool needs that name) |
-| `.env.example`, `.gitignore` | Created only if missing |
+| `.env.example`, `.gitignore`, `.gitleaksignore` | Created only if missing |
 
 **It never overwrites your files.** If one already exists, the new version is saved as `<name>.suggested` for you to review and merge.
 
 Options: `--dir <path>`, `--dry-run`, `--no-docker`.
 
 After `init`: `pip install pre-commit && pre-commit install`.
+
+### Secret scan flagged something fake?
+
+The CI secret scan (gitleaks) also looks at your git history, so a fake key in a test file can fail the build. If the value is fake or an example, copy the `Fingerprint:` line from the CI log into `.gitleaksignore` (one per line; `#` starts a comment). Better still, build fake values at runtime in tests so no scanner sees a literal. If the value is real, revoke it and replace it instead.
 
 ### What blocks and what only warns
 
@@ -40,7 +44,7 @@ To avoid false alarms that make people turn the tool off, only high-confidence p
 ## `check`: find problems
 
 ```bash
-secure-baseline check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
+vibe-it-securely check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
 ```
 
 Looks for:
@@ -62,11 +66,11 @@ The exit code is `1` if anything at or above `--fail-on` (default `high`) is fou
 
 ### Silencing false alarms
 
-- On one line: add the comment `secure-baseline-ignore`
-- For whole files or folders: list them in `.secure-baselineignore` (one path per line, `#` for comments)
+- On one line: add the comment `vibe-it-securely-ignore`
+- For whole files or folders: list them in `.vibe-it-securely-ignore` (one path per line, `#` for comments)
 
 ```
-# .secure-baselineignore
+# .vibe-it-securely-ignore
 test/fixtures/
 ```
 

@@ -14,11 +14,11 @@ const value = (name) => {
 };
 const dir = path.resolve(value("--dir") || process.cwd());
 
-const HELP = `secure-baseline - a security baseline for your project
+const HELP = `vibe-it-securely - a security baseline for your project
 
 Usage:
-  secure-baseline init  [--dir <path>] [--dry-run] [--no-docker]
-  secure-baseline check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
+  vibe-it-securely init  [--dir <path>] [--dry-run] [--no-docker]
+  vibe-it-securely check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
 
 init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assistant
        rules. Existing files are never overwritten; new versions are saved as
@@ -60,7 +60,7 @@ if (cmd === "init") {
     console.log("\nHeads up:");
     for (const n of notes) console.log("  - " + n);
   }
-  console.log("\nNext: pip install pre-commit && pre-commit install, then run: secure-baseline check");
+  console.log("\nNext: pip install pre-commit && pre-commit install, then run: vibe-it-securely check");
   console.log("Note: this sets up a security baseline. It reduces common risks; it does not make your project secure on its own.");
 } else if (cmd === "check") {
   const failOn = value("--fail-on") || "high";

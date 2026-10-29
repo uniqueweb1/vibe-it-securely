@@ -35,6 +35,7 @@ export function init({ dir, dryRun = false, docker = true }) {
   const results = files.map((f) => safeWrite(dir, f.path, f.content, { dryRun }));
   // Quiet extras: only create if missing, never write .suggested copies
   results.push(safeWrite(dir, ".env.example", t.envExample(), { dryRun, onExists: "skip" }));
+  results.push(safeWrite(dir, ".gitleaksignore", t.gitleaksIgnore(), { dryRun, onExists: "skip" }));
 
   const notes = [];
   const giPath = path.join(dir, ".gitignore");

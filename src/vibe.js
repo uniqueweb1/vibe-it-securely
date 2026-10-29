@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const IGNORE = "secure-baseline-ignore";
+const IGNORE = "vibe-it-securely-ignore";
 
 // ---------------------------------------------------------------------------
 // Secrets that leak through naming mistakes

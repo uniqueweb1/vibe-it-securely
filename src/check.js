@@ -45,7 +45,7 @@ export const RULES = {
     severity: "medium",
     title: "A password, token or key may be written directly in the code",
     why: "Secrets in code end up in git history and are visible to anyone with access to the repository.",
-    fix: "Move the value to an environment variable (e.g. process.env.X or os.environ[\"X\"]). If it was real, change it. If it is a harmless example, add the comment secure-baseline-ignore on that line.",
+    fix: "Move the value to an environment variable (e.g. process.env.X or os.environ[\"X\"]). If it was real, change it. If it is a harmless example, add the comment vibe-it-securely-ignore on that line.",
   },
   "env-committed": {
     severity: "high",
@@ -160,7 +160,7 @@ export const RULES = {
     severity: "medium",
     title: "A route that changes data shows no sign of a login check",
     why: "Without a check, anyone on the internet who finds the address can create, change or delete data. AI tools often generate routes like this and forget the login check.",
-    fix: "Check who the user is before doing the work, for example with auth middleware or a session check, and return 401 if they are not logged in. If the route is meant to be public, add the comment secure-baseline-ignore on its line.",
+    fix: "Check who the user is before doing the work, for example with auth middleware or a session check, and return 401 if they are not logged in. If the route is meant to be public, add the comment vibe-it-securely-ignore on its line.",
   },
   "sql-rls-disabled": {
     severity: "medium",
@@ -216,7 +216,7 @@ export const RULES = {
     severity: "medium",
     title: "No .dockerignore file",
     why: "Without it, files like .env and .git can be copied into your image by COPY . .",
-    fix: "Create a .dockerignore listing .git, .env, node_modules and similar. Running secure-baseline init generates one.",
+    fix: "Create a .dockerignore listing .git, .env, node_modules and similar. Running vibe-it-securely init generates one.",
   },
 
   // ---------- Project hygiene ----------
@@ -224,7 +224,7 @@ export const RULES = {
     severity: "medium",
     title: "No pre-commit hooks set up",
     why: "Nothing stops a secret from being committed before it is too late.",
-    fix: "Run secure-baseline init, then: pip install pre-commit && pre-commit install",
+    fix: "Run vibe-it-securely init, then: pip install pre-commit && pre-commit install",
   },
   "hook-not-installed": {
     severity: "medium",
@@ -236,7 +236,7 @@ export const RULES = {
     severity: "medium",
     title: "No automated checks on your repository (CI)",
     why: "Local hooks can be skipped with --no-verify. CI is the safety net that cannot be skipped.",
-    fix: "Run secure-baseline init to generate a GitHub Actions workflow.",
+    fix: "Run vibe-it-securely init to generate a GitHub Actions workflow.",
   },
   "lockfile-missing": {
     severity: "medium",
@@ -248,11 +248,11 @@ export const RULES = {
     severity: "info",
     title: "No security rules for your AI coding assistant",
     why: "AI assistants follow written project rules. Without them they may write insecure code by default.",
-    fix: "Run secure-baseline init to generate AGENTS.md (copy it to CLAUDE.md or .cursorrules if your tool needs that name).",
+    fix: "Run vibe-it-securely init to generate AGENTS.md (copy it to CLAUDE.md or .cursorrules if your tool needs that name).",
   },
 };
 
-const IGNORE_MARK = "secure-baseline-ignore";
+const IGNORE_MARK = "vibe-it-securely-ignore";
 const SKIP_DIRS = new Set([
   ".git", "node_modules", ".venv", "venv", "env", "__pycache__", "dist", "build",
   ".next", ".nuxt", "coverage", ".tox", ".mypy_cache", ".pytest_cache", "vendor", ".idea", ".vscode",
@@ -428,11 +428,11 @@ function checkDockerfile(rel, text, add) {
   });
 }
 
-/** Reads .secure-baselineignore: one path or folder prefix per line, # for comments. */
+/** Reads .vibe-it-securely-ignore: one path or folder prefix per line, # for comments. */
 function loadIgnore(dir) {
   try {
     return fs
-      .readFileSync(path.join(dir, ".secure-baselineignore"), "utf8")
+      .readFileSync(path.join(dir, ".vibe-it-securely-ignore"), "utf8")
       .split(/\r?\n/)
       .map((l) => l.trim().replace(/^\.?\//, ""))
       .filter((l) => l && !l.startsWith("#"));

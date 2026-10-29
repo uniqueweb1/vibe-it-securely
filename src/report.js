@@ -47,7 +47,7 @@ export function formatReport(result, { maxLocations = 5 } = {}) {
   if (total === 0) out.push("Nothing found by these checks.");
   out.push(
     "This is a baseline check, not a security audit. A clean result does not mean your project is secure.",
-    "False alarm? Add the comment secure-baseline-ignore to that line.",
+    "False alarm? Add the comment vibe-it-securely-ignore to that line.",
   );
   return out.join("\n");
 }

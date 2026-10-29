@@ -1,0 +1,4 @@
+# Fake test fixture (test/vibe.test.js) flagged by gitleaks; value was a placeholder, not a real secret.
+# The fixture is now assembled at runtime. These entries cover the earlier commits in git history.
+c8b2562c2c15ff6e3ac79377698ccadcf9570112:test/vibe.test.js:generic-api-key:37
+aa3933b137248d29618c6e74fec5ac7161c9e790:secure-baseline/test/vibe.test.js:generic-api-key:37

@@ -16,12 +16,13 @@ const dir = path.resolve(value("--dir") || process.cwd());
 const HELP = `secure-baseline - a security baseline for your project
 
 Usage:
-  secure-baseline init  [--dir <path>] [--dry-run]
+  secure-baseline init  [--dir <path>] [--dry-run] [--no-docker]
   secure-baseline check [--dir <path>] [--fail-on high|medium|none] [--json]
 
 init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assistant
        rules. Existing files are never overwritten; new versions are saved as
-       <name>.suggested for you to review.
+       <name>.suggested for you to review. Use --no-docker for libraries, CLIs
+       and scripts that do not ship as a container.
 check  Looks for leaked secrets, risky code patterns, Docker problems and missing
        safeguards, and explains each finding in plain language.
        Exit code 1 if anything at or above --fail-on is found (default: high).`;
@@ -33,7 +34,7 @@ if (!cmd || cmd === "--help" || cmd === "-h") {
 
 if (cmd === "init") {
   const dryRun = flag("--dry-run");
-  const { stack, results, notes, error } = init({ dir, dryRun });
+  const { stack, results, notes, error } = init({ dir, dryRun, docker: !flag("--no-docker") });
   if (error) {
     console.error(error);
     process.exit(1);

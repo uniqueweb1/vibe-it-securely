@@ -377,12 +377,28 @@ function checkDockerfile(rel, text, add) {
   });
 }
 
+/** Reads .secure-baselineignore: one path or folder prefix per line, # for comments. */
+function loadIgnore(dir) {
+  try {
+    return fs
+      .readFileSync(path.join(dir, ".secure-baselineignore"), "utf8")
+      .split(/\r?\n/)
+      .map((l) => l.trim().replace(/^\.?\//, ""))
+      .filter((l) => l && !l.startsWith("#"));
+  } catch {
+    return [];
+  }
+}
+const isIgnored = (rel, patterns) =>
+  patterns.some((p) => (p.endsWith("/") ? rel.startsWith(p) : rel === p || rel.startsWith(p + "/")));
+
 export function check(dir) {
   const stack = detectStack(dir);
   const findings = [];
   const add = (ruleId, file, line) => findings.push({ ruleId, severity: RULES[ruleId].severity, file, line });
 
-  const files = walk(dir);
+  const ignored = loadIgnore(dir);
+  const files = walk(dir).filter((f) => !isIgnored(f, ignored));
   const has = (f) => fs.existsSync(path.join(dir, f));
 
   for (const rel of files) scanFile(dir, rel, add);

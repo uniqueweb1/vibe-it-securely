@@ -82,3 +82,12 @@ test("dry run writes nothing", () => {
   init({ dir: d, dryRun: true });
   assert.ok(!fs.existsSync(path.join(d, "AGENTS.md")));
 });
+
+test("--no-docker skips container files", () => {
+  const d = tmp();
+  write(d, "package.json", "{}");
+  init({ dir: d, docker: false });
+  assert.ok(!fs.existsSync(path.join(d, "Dockerfile")));
+  assert.ok(!fs.existsSync(path.join(d, ".dockerignore")));
+  assert.ok(fs.existsSync(path.join(d, ".pre-commit-config.yaml")));
+});

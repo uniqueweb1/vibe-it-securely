@@ -133,3 +133,13 @@ test("env file present but not gitignored is flagged", () => {
   write(d, ".gitignore", "node_modules\n.env\n");
   assert.ok(!ids(check(d)).includes("env-not-ignored"));
 });
+
+test(".secure-baselineignore excludes folders from scanning", () => {
+  const d = tmp();
+  write(d, "src/a.js", "eval(x);\n");
+  write(d, "fixtures/b.js", "eval(y);\n");
+  write(d, ".secure-baselineignore", "# test data\nfixtures/\n");
+  const hits = check(d).findings.filter((f) => f.ruleId === "js-eval");
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].file, "src/a.js");
+});

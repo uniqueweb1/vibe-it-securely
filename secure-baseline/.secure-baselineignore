@@ -1,0 +1,5 @@
+# Test fixtures contain deliberately insecure code
+test/
+# Rule descriptions mention risky functions by name
+src/check.js
+src/templates.js

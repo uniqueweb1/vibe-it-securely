@@ -90,7 +90,7 @@ test("safe Python equivalents are not flagged", () => {
 
 test("comment lines and ignore marker suppress code findings", () => {
   const d = tmp();
-  write(d, "x.js", ["// eval(old);", "eval(ok); // secure-baseline-ignore"].join("\n"));
+  write(d, "x.js", ["// eval(old);", "eval(ok); // vibe-it-securely-ignore"].join("\n"));
   assert.ok(!ids(check(d)).includes("js-eval"));
 });
 
@@ -134,11 +134,11 @@ test("env file present but not gitignored is flagged", () => {
   assert.ok(!ids(check(d)).includes("env-not-ignored"));
 });
 
-test(".secure-baselineignore excludes folders from scanning", () => {
+test(".vibe-it-securely-ignore excludes folders from scanning", () => {
   const d = tmp();
   write(d, "src/a.js", "eval(x);\n");
   write(d, "fixtures/b.js", "eval(y);\n");
-  write(d, ".secure-baselineignore", "# test data\nfixtures/\n");
+  write(d, ".vibe-it-securely-ignore", "# test data\nfixtures/\n");
   const hits = check(d).findings.filter((f) => f.ruleId === "js-eval");
   assert.equal(hits.length, 1);
   assert.equal(hits[0].file, "src/a.js");

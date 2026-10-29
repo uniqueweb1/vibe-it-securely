@@ -68,7 +68,7 @@ test("Express routes: middleware, app-level auth, in-handler check and public pa
 
 test("Express routes: ignore marker works", () => {
   const d = tmp();
-  write(d, "a.js", "app.post('/api/feedback', (req, res) => { res.send(1); }); // secure-baseline-ignore\n");
+  write(d, "a.js", "app.post('/api/feedback', (req, res) => { res.send(1); }); // vibe-it-securely-ignore\n");
   assert.ok(!ids(check(d)).includes("js-route-no-auth"));
 });
 

@@ -33,6 +33,19 @@ Requires Node 18+. No dependencies.
 
 > The package is published under the `@uniqweb` scope, so always include it in the `npx` / `npm i` commands. Once installed, the command itself is just `vibe-it-securely`.
 
+## Starting a brand-new project
+
+`init` works best at the very start, before you write any code, because `AGENTS.md` tells your AI assistant the security rules before it writes anything.
+
+```bash
+mkdir my-app && cd my-app
+git init
+npx @uniqweb/vibe-it-securely init --stack ts      # or: --stack js, --stack python, --stack ts,python
+pip install pre-commit && pre-commit install
+```
+
+`--stack` is only needed in an empty folder. If you already created the project with a starter (Vite, Next.js, a Python template and so on), `init` detects it by itself. Create `package.json` (`npm init -y`) or `requirements.txt` afterwards so the CI dependency checks have something to audit.
+
 ## `init`: set up the safeguards
 
 Detects your stack (JS, TS, Python, or a mix; npm, pnpm or yarn) and generates:
@@ -41,19 +54,19 @@ Detects your stack (JS, TS, Python, or a mix; npm, pnpm or yarn) and generates:
 |---|---|
 | `.pre-commit-config.yaml` | Fast local checks: secret scanning and private-key detection before every commit |
 | `.github/workflows/security.yml` | The same checks in CI, plus dependency audit and static analysis. CI is the real enforcement, because local hooks can be skipped with `--no-verify` |
-| `Dockerfile`, `.dockerignore` | Multi-stage build, non-root user, no secrets copied in (skip with `--no-docker`) |
+| `Dockerfile`, `.dockerignore` | Only with `--docker`: multi-stage build, non-root user, no secrets copied in |
 | `AGENTS.md` | Security rules for AI coding assistants (copy to `CLAUDE.md` or `.cursorrules` if your tool needs that name) |
 | `.env.example`, `.gitignore`, `.gitleaksignore` | Created only if missing |
 
-**Monorepos are supported.** If your repository holds several projects (for example `frontend/` and `backend/`), `init` finds them in subfolders up to 3 levels deep. Repository-wide files (pre-commit, CI, `AGENTS.md`) go in the root, Docker files go next to each project, and the CI runs each project's dependency audit from the right folder.
+**Monorepos are supported.** If your repository holds several projects (for example `frontend/` and `backend/`), `init` finds them in subfolders up to 3 levels deep. Repository-wide files (pre-commit, CI, `AGENTS.md`) go in the root, Docker files (with `--docker`) go next to each project, and the CI runs each project's dependency audit from the right folder.
 
 **It never overwrites your files.** If one already exists, the new version is saved as `<name>.suggested` for you to review and merge.
 
 ```bash
-npx @uniqweb/vibe-it-securely init [--dir <path>] [--dry-run] [--no-docker]
+npx @uniqweb/vibe-it-securely init [--dir <path>] [--dry-run] [--stack js|ts|python] [--docker]
 ```
 
-Options: `--dir <path>`, `--dry-run` (preview without writing anything), `--no-docker` (for libraries, CLIs and scripts that do not ship as a container).
+Options: `--dir <path>`, `--dry-run` (preview without writing anything), `--stack js|ts|python` (for a brand-new empty folder, see below), `--docker` (also generate Dockerfiles; off by default because most projects do not need them on day one).
 
 After `init`: `pip install pre-commit && pre-commit install`.
 

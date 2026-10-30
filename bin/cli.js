@@ -20,14 +20,14 @@ const dir = path.resolve(value("--dir") || process.cwd());
 const HELP = `vibe-it-securely - a security baseline for your project
 
 Usage:
-  vibe-it-securely init  [--dir <path>] [--dry-run] [--no-docker]
+  vibe-it-securely init  [--dir <path>] [--dry-run] [--stack js|ts|python] [--docker]
   vibe-it-securely check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
   vibe-it-securely report [--dir <path>] [--online] [--out <file>] [--no-open]
 
-init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assistant
-       rules. Existing files are never overwritten; new versions are saved as
-       <name>.suggested for you to review. Use --no-docker for libraries, CLIs
-       and scripts that do not ship as a container.
+init   Generates pre-commit hooks, CI checks and AI-assistant rules. Existing files
+       are never overwritten; new versions are saved as <name>.suggested for you to
+       review. Starting a brand-new project in an empty folder? Add --stack ts,
+       --stack js or --stack python. Add --docker to also generate Dockerfiles.
 check  Looks for leaked secrets, risky code patterns, Docker problems and missing
        safeguards, and explains each finding in plain language.
        --online also verifies that every dependency name really exists on npm/PyPI
@@ -44,14 +44,17 @@ if (!cmd || cmd === "--help" || cmd === "-h") {
 
 if (cmd === "init") {
   const dryRun = flag("--dry-run");
-  const { stack, projects, results, notes, error } = init({ dir, dryRun, docker: !flag("--no-docker") });
+  const stackFlag = flag("--stack") ? (value("--stack") && !value("--stack").startsWith("--") ? value("--stack") : "") : undefined;
+  const { stack, projects, results, notes, error, docker } = init({ dir, dryRun, docker: flag("--docker") && !flag("--no-docker"), stackFlag });
   if (error) {
     console.error(error);
     process.exit(1);
   }
   const describe = (s) => [s.typescript ? "TypeScript" : s.node ? "JavaScript" : null, s.python ? "Python" : null].filter(Boolean).join(" + ");
   const suffix = dryRun ? "  (dry run, nothing written)" : "";
-  if (projects.length === 1 && projects[0].path === "") {
+  if (projects.length === 1 && projects[0].virtual) {
+    console.log("New project: " + describe(stack) + " (from --stack, no project files yet)" + suffix);
+  } else if (projects.length === 1 && projects[0].path === "") {
     console.log("Detected: " + describe(stack) + suffix);
   } else {
     console.log(`Detected ${projects.length} ${projects.length === 1 ? "project" : "projects"}${suffix}:`);
@@ -73,7 +76,8 @@ if (cmd === "init") {
     console.log("\nHeads up:");
     for (const n of notes) console.log("  - " + n);
   }
-  console.log("\nNext: pip install pre-commit && pre-commit install, then run: vibe-it-securely check");
+  if (!docker) console.log("\nDocker files were not created. Add --docker if you want them.");
+  console.log("\nNext: git init (if you have not yet), pip install pre-commit && pre-commit install, then run: vibe-it-securely report");
   console.log("Note: this sets up a security baseline. It reduces common risks; it does not make your project secure on its own.");
 } else if (cmd === "check") {
   const failOn = value("--fail-on") || "high";

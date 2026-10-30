@@ -88,3 +88,20 @@ export function detectWorkspace(dir, maxDepth = 3) {
   };
   return { projects, stack };
 }
+
+/** Parses --stack values like "ts", "js", "python" or "ts,python" (used when a folder has no project files yet). */
+export function parseStackFlag(value) {
+  const stack = { node: false, typescript: false, python: false, packageManager: null, hasNodeLock: false, pythonDeps: null };
+  const bad = [];
+  for (const raw of String(value ?? "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean)) {
+    if (["js", "javascript", "node", "nodejs"].includes(raw)) stack.node = true;
+    else if (["ts", "typescript"].includes(raw)) {
+      stack.node = true;
+      stack.typescript = true;
+    } else if (["py", "python"].includes(raw)) stack.python = true;
+    else bad.push(raw);
+  }
+  if (stack.node) stack.packageManager = "npm";
+  if (stack.python) stack.pythonDeps = "requirements.txt";
+  return { stack, bad, empty: !stack.node && !stack.python };
+}

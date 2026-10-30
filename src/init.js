@@ -1,20 +1,37 @@
 import fs from "node:fs";
 import path from "node:path";
-import { detectWorkspace } from "./detect.js";
+import { detectWorkspace, parseStackFlag } from "./detect.js";
 import { safeWrite } from "./safe-write.js";
 import * as t from "./templates.js";
 
-export function init({ dir, dryRun = false, docker = true }) {
-  const { projects, stack } = detectWorkspace(dir);
-  if (!projects.length) {
-    return {
-      stack,
-      projects,
-      results: [],
-      notes: [],
-      error: "No supported project found (looked in this folder and up to 3 levels of subfolders for package.json, requirements.txt, pyproject.toml, Pipfile, setup.py).",
-    };
+const NO_PROJECT =
+  "No supported project found (looked in this folder and up to 3 levels of subfolders for package.json, requirements.txt, pyproject.toml, Pipfile, setup.py). " +
+  "Starting a brand-new project in an empty folder? Tell it what you are building: --stack ts, --stack js or --stack python.";
+
+/**
+ * docker:    also generate Dockerfiles (off by default; most new projects do not need them yet)
+ * stackFlag: "js" | "ts" | "python" (comma separated). Only used when no project files exist yet.
+ */
+export function init({ dir, dryRun = false, docker = false, stackFlag } = {}) {
+  let { projects, stack } = detectWorkspace(dir);
+  const notes = [];
+
+  if (stackFlag !== undefined) {
+    const parsed = parseStackFlag(stackFlag);
+    if (parsed.bad.length || parsed.empty) {
+      return { stack, projects, results: [], notes, error: "Unknown --stack value. Use js, ts or python (for example --stack ts, or --stack ts,python)." };
+    }
+    if (!projects.length) {
+      projects = [{ path: "", stack: parsed.stack, virtual: true }];
+      stack = parsed.stack;
+      const files = [parsed.stack.node ? "package.json (run: npm init -y)" : null, parsed.stack.python ? "requirements.txt" : null].filter(Boolean);
+      notes.push(`No project files exist yet, so this was set up from --stack. Create ${files.join(" and ")} so the CI dependency checks have something to audit.`);
+    } else {
+      notes.push("Project files were found, so --stack was ignored.");
+    }
   }
+
+  if (!projects.length) return { stack, projects, results: [], notes, error: NO_PROJECT };
 
   // Repository-wide files live at the root
   const files = [
@@ -23,7 +40,7 @@ export function init({ dir, dryRun = false, docker = true }) {
     { path: "AGENTS.md", content: t.agentRules(stack) },
   ];
 
-  // Container files live next to each project (libraries, CLIs and scripts can skip them with --no-docker)
+  // Container files live next to each project, only when asked for with --docker
   if (docker) {
     for (const p of projects) {
       const prefix = p.path ? p.path + "/" : "";
@@ -44,7 +61,6 @@ export function init({ dir, dryRun = false, docker = true }) {
   results.push(safeWrite(dir, ".env.example", t.envExample(), { dryRun, onExists: "skip" }));
   results.push(safeWrite(dir, ".gitleaksignore", t.gitleaksIgnore(), { dryRun, onExists: "skip" }));
 
-  const notes = [];
   const giPath = path.join(dir, ".gitignore");
   if (!fs.existsSync(giPath)) {
     results.push(safeWrite(dir, ".gitignore", t.gitignore(), { dryRun }));
@@ -55,7 +71,7 @@ export function init({ dir, dryRun = false, docker = true }) {
     }
   }
   for (const p of projects) {
-    if (p.stack.node && !p.stack.hasNodeLock && p.stack.packageManager === "npm") {
+    if (!p.virtual && p.stack.node && !p.stack.hasNodeLock && p.stack.packageManager === "npm") {
       notes.push(`No package-lock.json found in ${p.path || "the project folder"}. Commit one so installs are reproducible and dependency audits are accurate.`);
     }
   }
@@ -75,5 +91,5 @@ export function init({ dir, dryRun = false, docker = true }) {
     }
   }
 
-  return { stack, projects, results, notes };
+  return { stack, projects, results, notes, docker };
 }

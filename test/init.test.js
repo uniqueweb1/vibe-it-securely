@@ -33,7 +33,7 @@ test("empty folder is rejected", () => {
 test("init creates baseline files for a Node project", () => {
   const d = tmp();
   write(d, "package.json", "{}");
-  const { results } = init({ dir: d });
+  const { results } = init({ dir: d, docker: true });
   for (const f of [".pre-commit-config.yaml", ".github/workflows/security.yml", "Dockerfile", ".dockerignore", "AGENTS.md", ".env.example", ".gitignore"]) {
     assert.ok(fs.existsSync(path.join(d, f)), f + " missing");
   }
@@ -44,7 +44,7 @@ test("mixed project gets two Dockerfiles", () => {
   const d = tmp();
   write(d, "package.json", "{}");
   write(d, "requirements.txt", "flask\n");
-  init({ dir: d });
+  init({ dir: d, docker: true });
   assert.ok(fs.existsSync(path.join(d, "Dockerfile.node")));
   assert.ok(fs.existsSync(path.join(d, "Dockerfile.python")));
 });
@@ -53,7 +53,7 @@ test("never overwrites existing files; writes .suggested instead", () => {
   const d = tmp();
   write(d, "package.json", "{}");
   write(d, "Dockerfile", "MY OWN DOCKERFILE");
-  const { results } = init({ dir: d });
+  const { results } = init({ dir: d, docker: true });
   assert.equal(fs.readFileSync(path.join(d, "Dockerfile"), "utf8"), "MY OWN DOCKERFILE");
   assert.ok(fs.existsSync(path.join(d, "Dockerfile.suggested")));
   assert.ok(results.find((r) => r.path === "Dockerfile.suggested"));
@@ -83,10 +83,10 @@ test("dry run writes nothing", () => {
   assert.ok(!fs.existsSync(path.join(d, "AGENTS.md")));
 });
 
-test("--no-docker skips container files", () => {
+test("Docker files are opt-in", () => {
   const d = tmp();
   write(d, "package.json", "{}");
-  init({ dir: d, docker: false });
+  init({ dir: d });
   assert.ok(!fs.existsSync(path.join(d, "Dockerfile")));
   assert.ok(!fs.existsSync(path.join(d, ".dockerignore")));
   assert.ok(fs.existsSync(path.join(d, ".pre-commit-config.yaml")));

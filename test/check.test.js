@@ -104,7 +104,7 @@ test("Dockerfile problems: root, latest tag, secrets, copied .env", () => {
 test("good multi-stage Dockerfile passes Docker checks", () => {
   const d = tmp();
   write(d, "package.json", "{}");
-  init({ dir: d });
+  init({ dir: d, docker: true });
   const got = ids(check(d));
   for (const id of ["docker-root", "docker-latest", "docker-secret-env", "docker-copy-env", "dockerignore-missing", "precommit-missing", "ci-missing", "agent-rules-missing"]) {
     assert.ok(!got.includes(id), "should not report " + id);

@@ -41,7 +41,7 @@ test("a single root project is still reported with path ''", () => {
 
 test("init works from the repository root and puts files where they belong", () => {
   const d = monorepo();
-  const r = init({ dir: d });
+  const r = init({ dir: d, docker: true });
   assert.ok(!r.error);
   for (const f of [".pre-commit-config.yaml", ".github/workflows/security.yml", "AGENTS.md", "frontend/Dockerfile", "frontend/.dockerignore", "backend/Dockerfile", "backend/.dockerignore"]) {
     assert.ok(fs.existsSync(path.join(d, f)), f + " missing");
@@ -54,9 +54,9 @@ test("init works from the repository root and puts files where they belong", () 
   assert.ok(fs.readFileSync(path.join(d, "frontend/Dockerfile"), "utf8").includes("node:22-slim"));
 });
 
-test("init --no-docker skips container files in every project", () => {
+test("init skips container files in every project unless --docker is given", () => {
   const d = monorepo();
-  init({ dir: d, docker: false });
+  init({ dir: d });
   assert.ok(!fs.existsSync(path.join(d, "frontend/Dockerfile")));
   assert.ok(!fs.existsSync(path.join(d, "backend/Dockerfile")));
 });

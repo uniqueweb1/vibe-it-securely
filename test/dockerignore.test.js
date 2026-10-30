@@ -18,7 +18,7 @@ test("files that init generates in project folders are not flagged afterwards", 
   const d = tmp();
   write(d, "frontend/package.json", "{}");
   write(d, "backend/requirements.txt", "fastapi\n");
-  init({ dir: d });
+  init({ dir: d, docker: true });
   assert.deepEqual(missing(d), []);
 });
 

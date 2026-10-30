@@ -228,7 +228,7 @@ export const RULES = {
     severity: "medium",
     title: "No .dockerignore file",
     why: "Without it, files like .env and .git can be copied into your image by COPY . .",
-    fix: "Create a .dockerignore listing .git, .env, node_modules and similar. Running vibe-it-securely init generates one.",
+    fix: "Create a .dockerignore next to the Dockerfile (or in the folder you build from) listing .git, .env, node_modules and similar. Running vibe-it-securely init generates one.",
   },
 
   // ---------- Project hygiene ----------
@@ -494,7 +494,7 @@ export function check(dir) {
   for (const rel of files) scanFile(dir, rel, add);
   analyzeSql(dir, files.filter((f) => f.endsWith(".sql")), detectSupabase(dir, files), add);
 
-  const dockerfiles = files.filter((f) => /^(Dockerfile(\.[\w.-]+)?|[\w.-]+\.dockerfile)$/i.test(path.basename(f)) && !f.endsWith(".suggested"));
+  const dockerfiles = files.filter((f) => /^(Dockerfile(\.[\w.-]+)?|[\w.-]+\.dockerfile)$/i.test(path.basename(f)) && !f.endsWith(".suggested") && !f.endsWith(".dockerignore"));
   for (const rel of dockerfiles) {
     try {
       checkDockerfile(rel, fs.readFileSync(path.join(dir, rel), "utf8"), add);
@@ -502,7 +502,15 @@ export function check(dir) {
       /* unreadable file: skip */
     }
   }
-  if (dockerfiles.length && !has(".dockerignore")) add("dockerignore-missing");
+  // A Dockerfile is covered by a .dockerignore in its own folder (the usual build context),
+  // by "<Dockerfile name>.dockerignore" beside it, or by one in the repository root.
+  for (const rel of dockerfiles) {
+    const folder = path.posix.dirname(rel);
+    const beside = (name) => has(folder === "." ? name : folder + "/" + name);
+    if (!has(".dockerignore") && !beside(".dockerignore") && !beside(path.posix.basename(rel) + ".dockerignore")) {
+      add("dockerignore-missing", rel);
+    }
+  }
 
   // .env handling
   const tracked = git(dir, ["ls-files"]);

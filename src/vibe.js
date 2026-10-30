@@ -127,16 +127,14 @@ export function analyzeSql(dir, sqlFiles, usesSupabase, add) {
 
 export function detectSupabase(dir, files) {
   if (files.some((f) => f.startsWith("supabase/"))) return true;
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
-    if (JSON.stringify({ ...pkg.dependencies, ...pkg.devDependencies }).includes("supabase")) return true;
-  } catch {
-    /* no package.json */
-  }
-  try {
-    if (/supabase/i.test(fs.readFileSync(path.join(dir, "requirements.txt"), "utf8"))) return true;
-  } catch {
-    /* no requirements.txt */
+  for (const f of files) {
+    const base = path.basename(f);
+    if (base !== "package.json" && base !== "requirements.txt") continue;
+    try {
+      if (/supabase/i.test(fs.readFileSync(path.join(dir, f), "utf8"))) return true;
+    } catch {
+      /* unreadable manifest: skip */
+    }
   }
   return false;
 }

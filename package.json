@@ -1,6 +1,6 @@
 {
-  "name": "@uniqueweb1/vibe-it-securely",
-  "version": "0.1.0",
+  "name": "@uniqweb/vibe-it-securely",
+  "version": "0.1.1",
   "description": "A security baseline for JavaScript, TypeScript and Python projects: pre-commit hooks, CI checks, hardened Docker config and AI-assistant rules, plus a plain-language security check.",
   "type": "module",
   "bin": {
@@ -15,10 +15,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/uniqueweb1/vibe-it-securely.git"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "url": "git+https://github.com/uniqueweb1/vibe-it-securely.git"
   },
   "files": [
     "bin",

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { detectStack } from "./detect.js";
+import { detectWorkspace } from "./detect.js";
 import { lineSecretRule, checkRoutes, analyzeSql, detectSupabase, PUBLIC_ENV } from "./vibe.js";
 
 /**
@@ -52,6 +52,18 @@ export const RULES = {
     title: "A .env file is tracked by git",
     why: ".env files usually hold real passwords and keys. Once committed, they stay in history even if you delete the file later.",
     fix: "Run: git rm --cached .env, add .env to .gitignore, and change every secret that was in the file.",
+  },
+  "npm-token-committed": {
+    severity: "high",
+    title: "An npm login token is stored in a file that git tracks",
+    why: "Anyone who can read this repository can publish packages as you, including packages other people install.",
+    fix: "Revoke the token on npmjs.com (Access Tokens) and create a new one. Keep tokens out of the project: use npm login, or write ${NPM_TOKEN} in .npmrc and set that environment variable. Then remove the token from git history.",
+  },
+  "npmrc-token-unignored": {
+    severity: "high",
+    title: "Your .npmrc holds an npm login token and git is not ignoring it",
+    why: "The next git add . and git push would publish the token. Anyone who sees it could publish packages as you.",
+    fix: "Add .npmrc to .gitignore now, before you commit. Better still, keep the token out of the project folder: run npm login, which stores it in your user folder instead.",
   },
   "env-not-ignored": {
     severity: "medium",
@@ -266,6 +278,7 @@ const SECRET_PATTERNS = [
   ["secret-aws", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/],
   ["secret-github", /\bgh[pousr]_[A-Za-z0-9]{36,}\b/],
   ["secret-slack", /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/],
+  ["npm-token-committed", /\bnpm_[A-Za-z0-9]{36}\b/],
   ["secret-ai-key", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}\b/],
 ];
 const GENERIC_SECRET = /\b(?:api[_-]?key|secret[_-]?key|secret|password|passwd|token|auth[_-]?token)\b["']?\s*[:=]\s*["'`]([^"'`\s]{12,})["'`]/i;
@@ -326,6 +339,30 @@ function git(dir, args) {
   }
 }
 
+/** Tests often hold deliberately fake values and unsafe snippets, so noisy rules skip them. */
+const isTestFile = (rel) =>
+  /(^|\/)(tests?|__tests__|specs?|fixtures|__mocks__|mocks)\//i.test(rel) ||
+  /\.(test|spec)\.[jt]sx?$/.test(rel) ||
+  /(^|\/)test_[^/]*\.py$/.test(rel) ||
+  /_test\.py$/.test(rel) ||
+  /(^|\/)conftest\.py$/.test(rel);
+
+function isGitIgnored(dir, rel, isRepo) {
+  if (isRepo) {
+    try {
+      execFileSync("git", ["-C", dir, "check-ignore", "-q", rel], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return fs.readFileSync(path.join(dir, ".gitignore"), "utf8").split(/\r?\n/).some((l) => /^\/?(\*\*\/)?\.npmrc$/.test(l.trim()));
+  } catch {
+    return false;
+  }
+}
+
 const isEnvFile = (rel) => /(^|\/)\.env(\..+)?$/.test(rel) && !/\.(example|sample|template)$/.test(rel);
 const isCommentLine = (line, ext) => {
   const t = line.trim();
@@ -341,7 +378,7 @@ function scanFile(dir, rel, add) {
   } catch {
     return;
   }
-  if (stat.size > MAX_BYTES || SKIP_FILES.test(rel)) return;
+  if (stat.size > MAX_BYTES || SKIP_FILES.test(rel) || path.basename(rel) === ".npmrc") return;
   let text;
   try {
     text = fs.readFileSync(full, "utf8");
@@ -359,7 +396,9 @@ function scanFile(dir, rel, add) {
   }
 
   const ext = path.extname(rel).toLowerCase();
-  const codePatterns = JS_EXT.has(ext) ? JS_PATTERNS : PY_EXT.has(ext) ? PY_PATTERNS : [];
+  const testFile = isTestFile(rel);
+  // In test files only high-confidence secret patterns apply; risky-code and generic password/token rules are skipped
+  const codePatterns = testFile ? [] : JS_EXT.has(ext) ? JS_PATTERNS : PY_EXT.has(ext) ? PY_PATTERNS : [];
   const lines = text.split(/\r?\n/);
 
   lines.forEach((line, i) => {
@@ -376,7 +415,7 @@ function scanFile(dir, rel, add) {
         secretHit = true;
       }
     }
-    if (!secretHit) {
+    if (!secretHit && !testFile) {
       const m = line.match(GENERIC_SECRET);
       if (m && !PLACEHOLDER.test(m[1]) && !/^(.)\1+$/.test(m[1])) add("secret-generic", rel, n);
     }
@@ -444,7 +483,7 @@ const isIgnored = (rel, patterns) =>
   patterns.some((p) => (p.endsWith("/") ? rel.startsWith(p) : rel === p || rel.startsWith(p + "/")));
 
 export function check(dir) {
-  const stack = detectStack(dir);
+  const { projects, stack } = detectWorkspace(dir);
   const findings = [];
   const add = (ruleId, file, line, detail) => findings.push({ ruleId, severity: RULES[ruleId].severity, file, line, detail });
 
@@ -481,6 +520,26 @@ export function check(dir) {
     if (!ignored) add("env-not-ignored");
   }
 
+  // .npmrc files that hold a real login token
+  const TOKEN_LINE = /(?:_authToken|_auth|_password)\s*=\s*(\S+)/;
+  const trackedSet = new Set(tracked === null ? [] : tracked.split("\n").filter(Boolean));
+  for (const f of files.filter((x) => path.basename(x) === ".npmrc")) {
+    let lines;
+    try {
+      lines = fs.readFileSync(path.join(dir, f), "utf8").split(/\r?\n/);
+    } catch {
+      continue;
+    }
+    const idx = lines.findIndex((l) => {
+      const t = l.trim();
+      const m = t.match(TOKEN_LINE);
+      return m && !t.startsWith("#") && !t.startsWith(";") && !m[1].startsWith("${") && m[1].length >= 8 && !PLACEHOLDER.test(m[1]);
+    });
+    if (idx < 0 || lines[idx].includes(IGNORE_MARK)) continue;
+    if (trackedSet.has(f)) add("npm-token-committed", f, idx + 1);
+    else if (!isGitIgnored(dir, f, tracked !== null)) add("npmrc-token-unignored", f, idx + 1);
+  }
+
   // hooks, CI, lockfile, agent rules
   const hookTool = has(".pre-commit-config.yaml") || has(".husky") || has("lefthook.yml");
   if (!hookTool) add("precommit-missing");
@@ -496,7 +555,10 @@ export function check(dir) {
   }
   if (!hasCI) add("ci-missing");
 
-  if (stack.node && !["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lockb"].some(has)) add("lockfile-missing");
+  for (const p of projects.filter((x) => x.stack.node)) {
+    const hasLock = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lockb"].some((f) => has(p.path ? p.path + "/" + f : f));
+    if (!hasLock) add("lockfile-missing", p.path ? p.path + "/package.json" : "package.json");
+  }
   if (!["AGENTS.md", "CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md", ".cursor/rules"].some(has)) add("agent-rules-missing");
 
   return { stack, findings, filesScanned: files.length };

@@ -143,3 +143,23 @@ test(".vibe-it-securely-ignore excludes folders from scanning", () => {
   assert.equal(hits.length, 1);
   assert.equal(hits[0].file, "src/a.js");
 });
+
+test("test files skip noisy rules but still catch high-confidence secrets", () => {
+  const d = tmp();
+  write(d, "backend/tests/test_api.py", [
+    'API_TOKEN = "fake-token-for-testing-12345"',
+    'password = "hunter2hunter2hunter2"',
+    "yaml.load(f)",
+    `KEY = "${FAKE_AWS}"`,
+  ].join("\n"));
+  write(d, "src/widget.test.ts", "el.innerHTML = html;\neval(x);\n");
+  write(d, "src/__tests__/a.js", 'const token = "abcdefghijklmnopqrstuvwx";\n');
+  write(d, "src/real.js", 'const token = "abcdefghijklmnopqrstuvwx";\n');
+  const r = check(d);
+  const where = (id) => r.findings.filter((f) => f.ruleId === id).map((f) => f.file).sort();
+  assert.deepEqual(where("secret-generic"), ["src/real.js"]);
+  assert.deepEqual(where("py-yaml-load"), []);
+  assert.deepEqual(where("js-inner-html"), []);
+  assert.deepEqual(where("js-eval"), []);
+  assert.deepEqual(where("secret-aws"), ["backend/tests/test_api.py"]);
+});

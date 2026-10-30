@@ -39,3 +39,52 @@ export function detectStack(dir) {
 
   return stack;
 }
+
+// Folders that never hold the project's own manifests
+const SKIP = new Set([
+  ".git", "node_modules", ".venv", "venv", "env", "__pycache__", "dist", "build", ".next", ".nuxt",
+  "coverage", ".tox", ".mypy_cache", ".pytest_cache", "vendor", ".idea", ".vscode",
+  "test", "tests", "__tests__", "fixtures", "__mocks__", "mocks", "examples",
+]);
+const MAX_PROJECTS = 12;
+
+/**
+ * Finds every JS/TS/Python project in this folder and up to `maxDepth` levels of subfolders,
+ * so monorepos (for example frontend/ + backend/) are understood.
+ * Returns { projects: [{ path, stack }], stack } where path is "" for the root folder
+ * and stack is a merged summary of everything found.
+ */
+export function detectWorkspace(dir, maxDepth = 3) {
+  const projects = [];
+  const visit = (rel, depth) => {
+    if (projects.length >= MAX_PROJECTS) return;
+    const abs = path.join(dir, rel);
+    const stack = detectStack(abs);
+    if (stack.node || stack.python) projects.push({ path: rel, stack });
+    if (depth >= maxDepth) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(abs, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.isDirectory() && !SKIP.has(e.name) && !e.name.startsWith(".")) {
+        visit(rel ? rel + "/" + e.name : e.name, depth + 1);
+      }
+    }
+  };
+  visit("", 0);
+
+  const firstNode = projects.find((p) => p.stack.node);
+  const firstPy = projects.find((p) => p.stack.python);
+  const stack = {
+    node: Boolean(firstNode),
+    typescript: projects.some((p) => p.stack.typescript),
+    python: Boolean(firstPy),
+    packageManager: firstNode ? firstNode.stack.packageManager : null,
+    hasNodeLock: firstNode ? firstNode.stack.hasNodeLock : false,
+    pythonDeps: firstPy ? firstPy.stack.pythonDeps : null,
+  };
+  return { projects, stack };
+}

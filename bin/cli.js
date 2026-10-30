@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { init } from "../src/init.js";
 import { check } from "../src/check.js";
 import { checkDependencies } from "../src/deps.js";
+import { renderHtml, openInBrowser } from "../src/html-report.js";
 import { formatReport, countBySeverity } from "../src/report.js";
 
 const args = process.argv.slice(2);
@@ -19,6 +22,7 @@ const HELP = `vibe-it-securely - a security baseline for your project
 Usage:
   vibe-it-securely init  [--dir <path>] [--dry-run] [--no-docker]
   vibe-it-securely check [--dir <path>] [--fail-on high|medium|none] [--json] [--online]
+  vibe-it-securely report [--dir <path>] [--online] [--out <file>] [--no-open]
 
 init   Generates pre-commit hooks, CI checks, hardened Docker files and AI-assistant
        rules. Existing files are never overwritten; new versions are saved as
@@ -28,7 +32,10 @@ check  Looks for leaked secrets, risky code patterns, Docker problems and missin
        safeguards, and explains each finding in plain language.
        --online also verifies that every dependency name really exists on npm/PyPI
        (AI tools sometimes invent package names). It contacts the public registries.
-       Exit code 1 if anything at or above --fail-on is found (default: high).`;
+       Exit code 1 if anything at or above --fail-on is found (default: high).
+report Same checks, shown as an easy-to-read web page that opens in your browser,
+       with buttons that copy a ready-made fix request for your AI assistant.
+       Saved in your temp folder unless you pass --out <file>.`;
 
 if (!cmd || cmd === "--help" || cmd === "-h") {
   console.log(HELP);
@@ -37,13 +44,19 @@ if (!cmd || cmd === "--help" || cmd === "-h") {
 
 if (cmd === "init") {
   const dryRun = flag("--dry-run");
-  const { stack, results, notes, error } = init({ dir, dryRun, docker: !flag("--no-docker") });
+  const { stack, projects, results, notes, error } = init({ dir, dryRun, docker: !flag("--no-docker") });
   if (error) {
     console.error(error);
     process.exit(1);
   }
-  const langs = [stack.typescript ? "TypeScript" : stack.node ? "JavaScript" : null, stack.python ? "Python" : null].filter(Boolean);
-  console.log("Detected: " + langs.join(" + ") + (dryRun ? "  (dry run, nothing written)" : ""));
+  const describe = (s) => [s.typescript ? "TypeScript" : s.node ? "JavaScript" : null, s.python ? "Python" : null].filter(Boolean).join(" + ");
+  const suffix = dryRun ? "  (dry run, nothing written)" : "";
+  if (projects.length === 1 && projects[0].path === "") {
+    console.log("Detected: " + describe(stack) + suffix);
+  } else {
+    console.log(`Detected ${projects.length} ${projects.length === 1 ? "project" : "projects"}${suffix}:`);
+    for (const p of projects) console.log("  " + (p.path || ".") + ": " + describe(p.stack));
+  }
   console.log("");
   const label = {
     created: "created   ",
@@ -80,6 +93,25 @@ if (cmd === "init") {
   const c = countBySeverity(result.findings);
   const fail = failOn === "high" ? c.high > 0 : failOn === "medium" ? c.high + c.medium > 0 : false;
   process.exit(fail ? 1 : 0);
+} else if (cmd === "report") {
+  const result = check(dir);
+  result.notes = [];
+  if (flag("--online")) {
+    const dep = await checkDependencies(dir);
+    result.findings.push(...dep.findings);
+    result.notes.push(`Checked ${dep.checked} dependency names against npm/PyPI.` + (dep.unverified ? ` ${dep.unverified} could not be verified (network problem or private registry).` : ""));
+  }
+  const html = renderHtml(result, { projectName: path.basename(dir) });
+  const out = value("--out") ? path.resolve(value("--out")) : path.join(os.tmpdir(), `vibe-it-securely-report-${Date.now()}.html`);
+  fs.writeFileSync(out, html);
+
+  const c = countBySeverity(result.findings);
+  console.log(`Scanned ${result.filesScanned} files: ${c.high} to fix first, ${c.medium} should fix, ${c.info} ${c.info === 1 ? "suggestion" : "suggestions"}.`);
+  console.log("Report saved to: " + out);
+  if (!flag("--no-open")) {
+    const opened = await openInBrowser(out);
+    console.log(opened ? "Opening it in your browser..." : "Could not open a browser automatically. Open the file above by double-clicking it.");
+  }
 } else {
   console.log(HELP);
   process.exit(1);

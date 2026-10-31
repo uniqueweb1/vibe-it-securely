@@ -142,6 +142,10 @@ test/fixtures/
 - Generated Dockerfiles guess your start command. Review the `TODO` comments in them.
 - Review generated files before relying on them. Pin third-party GitHub Actions to commit SHAs for stronger supply-chain safety.
 
+## Contributing
+
+Bug reports (especially false alarms), new checks, wording improvements and docs are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Development
 
 ```bash

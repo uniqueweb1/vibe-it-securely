@@ -1,6 +1,6 @@
 {
   "name": "@uniqweb/vibe-it-securely",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A security baseline for JavaScript, TypeScript and Python projects: pre-commit hooks, CI checks, hardened Docker config and AI-assistant rules, plus a plain-language security check.",
   "type": "module",
   "bin": {

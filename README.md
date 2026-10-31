@@ -44,7 +44,7 @@ npx @uniqweb/vibe-it-securely init --stack ts      # or: --stack js, --stack pyt
 pip install pre-commit && pre-commit install
 ```
 
-`--stack` is only needed in an empty folder. If you already created the project with a starter (Vite, Next.js, a Python template and so on), `init` detects it by itself. Create `package.json` (`npm init -y`) or `requirements.txt` afterwards so the CI dependency checks have something to audit.
+`--stack` is only needed in an empty folder. If you already created the project with a starter (Vite, Next.js, a Python template and so on), `init` detects it by itself. Create `package.json` (`npm init -y`) or `requirements.txt` afterwards so the CI dependency checks have something to audit. `--stack python` assumes `requirements.txt`; if you use `pyproject.toml` or Pipenv, re-run `init` once that file exists.
 
 ## `init`: set up the safeguards
 
@@ -112,7 +112,7 @@ Looks for:
   - Routes that change data (Express-style, Next.js `app/` and `pages/api`) with no sign of a login check. This is a heuristic, so public routes need the ignore comment.
   - Supabase `service_role` keys in code (including inside JWTs), and secrets exposed to the browser through public env variables such as `NEXT_PUBLIC_*`
   - Supabase tables created without row level security, or with it switched off
-- **Invented dependencies** (with `--online`): checks that every package in each project's `package.json` and `requirements.txt` really exists on npm / PyPI. AI tools sometimes make up names, and an attacker can register them. This contacts the public registries, so it is opt-in. Private-registry scopes and network failures are reported as "could not verify", never as findings.
+- **Invented dependencies** (with `--online`): checks that every package in each project's `package.json`, `requirements.txt`, `pyproject.toml` (standard, Poetry and uv layouts) and `Pipfile` really exists on npm / PyPI. AI tools sometimes make up names, and an attacker can register them. This contacts the public registries, so it is opt-in. Private registries and package indexes, and network failures, are reported as "could not verify", never as findings.
 
 Every finding says **where** it is, **why** it matters and **how** to fix it. Secret values are never printed.
 
@@ -138,6 +138,7 @@ test/fixtures/
 - The route-auth check looks for auth keywords near the route, so it can miss real gaps and flag public routes.
 - It does not check your dependency versions itself. That is done by `npm audit` / `pip-audit` in the generated CI workflow.
 - Project folders named `test`, `tests`, `fixtures`, `examples`, `node_modules` or `.venv` are not treated as projects, and at most 12 projects are detected.
+- Python dependency audit in CI: `requirements.txt` and standard `pyproject.toml` projects use `pip-audit`; Pipenv projects need a committed `Pipfile.lock`. Poetry projects that only use Poetry's own `[tool.poetry]` table were not tested with `pip-audit .`; if that CI step errors, export the dependencies with `poetry export` and audit that file instead. Dependencies declared only in `setup.py` or `setup.cfg` are not read by `--online`.
 - Generated Dockerfiles guess your start command. Review the `TODO` comments in them.
 - Review generated files before relying on them. Pin third-party GitHub Actions to commit SHAs for stronger supply-chain safety.
 

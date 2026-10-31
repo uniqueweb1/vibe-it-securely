@@ -76,6 +76,12 @@ export function init({ dir, dryRun = false, docker = false, stackFlag } = {}) {
     }
   }
 
+  for (const p of projects) {
+    if (!p.virtual && p.stack.pythonDeps === "pipfile" && !fs.existsSync(path.join(dir, p.path, "Pipfile.lock"))) {
+      notes.push(`No Pipfile.lock found in ${p.path || "the project folder"}. Run pipenv lock and commit it so the CI dependency audit can run.`);
+    }
+  }
+
   const npmrcPath = path.join(dir, ".npmrc");
   if (fs.existsSync(npmrcPath)) {
     const m = fs.readFileSync(npmrcPath, "utf8").match(/_authToken\s*=\s*(\S+)/);

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RULES } from "./check.js";
 import { detectWorkspace } from "./detect.js";
+import { requirementsNames, pyprojectNames, pipfileNames } from "./pydeps.js";
 
 const NON_REGISTRY_SPEC = /^(?:file:|link:|git\+|git:|github:|gitlab:|bitbucket:|https?:|workspace:|npm:|portal:|patch:)/i;
 
@@ -18,21 +19,24 @@ function npmNames(dir) {
     .map(([name]) => name);
 }
 
-function pythonNames(dir) {
-  let text;
-  try {
-    text = fs.readFileSync(path.join(dir, "requirements.txt"), "utf8");
-  } catch {
-    return [];
+/** Every Python dependency file in a project folder, with the names it lists. */
+function pythonSources(dir) {
+  const readers = [
+    ["requirements.txt", requirementsNames],
+    ["pyproject.toml", pyprojectNames],
+    ["Pipfile", pipfileNames],
+  ];
+  const out = [];
+  for (const [file, parse] of readers) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(dir, file), "utf8");
+    } catch {
+      continue;
+    }
+    out.push({ file, ...parse(text) });
   }
-  const names = [];
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.split("#")[0].trim();
-    if (!line || line.startsWith("-") || /^(?:git\+|https?:|file:|\.|\/)/i.test(line) || line.includes("@")) continue;
-    const m = line.match(/^([A-Za-z0-9][A-Za-z0-9._-]*)/);
-    if (m) names.push(m[1].toLowerCase().replace(/[_.]+/g, "-"));
-  }
-  return names;
+  return out;
 }
 
 /** Scopes (or everything) that a folder resolves from a private registry: these cannot be checked publicly. */
@@ -88,8 +92,14 @@ export async function checkDependencies(dir, { fetchImpl = globalThis.fetch, con
       }
       jobs.push({ eco: "npm", name, file: prefix + "package.json", url: "https://registry.npmjs.org/" + encodeURIComponent(name), headers: { Accept: "application/vnd.npm.install-v1+json" } });
     }
-    for (const name of pythonNames(abs)) {
-      jobs.push({ eco: "PyPI", name, file: prefix + "requirements.txt", url: "https://pypi.org/pypi/" + encodeURIComponent(name) + "/json", headers: {} });
+    for (const src of pythonSources(abs)) {
+      if (src.privateIndex) {
+        unverified += src.names.length; // names from a private package index cannot be checked on PyPI
+        continue;
+      }
+      for (const name of src.names) {
+        jobs.push({ eco: "PyPI", name, file: prefix + src.file, url: "https://pypi.org/pypi/" + encodeURIComponent(name) + "/json", headers: {} });
+      }
     }
   }
 

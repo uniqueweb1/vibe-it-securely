@@ -42,6 +42,20 @@ if (!cmd || cmd === "--help" || cmd === "-h") {
   process.exit(0);
 }
 
+if (["init", "check", "report"].includes(cmd)) {
+  let isFolder = false;
+  try {
+    isFolder = fs.statSync(dir).isDirectory();
+  } catch {
+    /* not found */
+  }
+  if (!isFolder) {
+    console.error(`Folder not found: ${dir}`);
+    console.error("Use the real path of your project, or open a terminal inside your project folder and leave out --dir.");
+    process.exit(1);
+  }
+}
+
 if (cmd === "init") {
   const dryRun = flag("--dry-run");
   const stackFlag = flag("--stack") ? (value("--stack") && !value("--stack").startsWith("--") ? value("--stack") : "") : undefined;

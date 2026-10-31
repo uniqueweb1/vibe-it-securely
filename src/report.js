@@ -12,6 +12,9 @@ const HEADING = {
 export function formatReport(result, { maxLocations = 5 } = {}) {
   const { findings, filesScanned } = result;
   const out = [];
+  if (filesScanned === 0) {
+    out.push("WARNING: no files were scanned. This usually means the folder is wrong or empty.", "Run the command from inside your project folder, or pass --dir with your real project path.", "");
+  }
 
   const groups = new Map();
   for (const f of findings) {

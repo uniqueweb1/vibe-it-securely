@@ -105,7 +105,9 @@ export function renderHtml(result, { projectName = "your project", date = new Da
   for (const f of findings) counts[f.severity]++;
 
   let verdict;
-  if (counts.high) {
+  if (!filesScanned) {
+    verdict = { cls: "medium", title: "No files were scanned", text: "This usually means the folder is wrong or empty. Run the command from inside your project folder, or pass --dir with your real project path." };
+  } else if (counts.high) {
     const n = counts.high;
     verdict = { cls: "high", title: `${n} ${n === 1 ? "problem needs" : "problems need"} fixing first`, text: "These are the most serious ones. Start with the red cards below." };
   } else if (counts.medium) {
